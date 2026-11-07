@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Teachable Machine Tracker</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            margin-top: 20px; 
+        }
+        #webcam-container { 
+            margin: 15px auto; 
+        }
+        #label-container div { 
+            margin: 4px 0; 
+            font-weight: bold; 
+        }
+        #log-container {
+            margin: 20px auto;
+            max-width: 420px;
+            text-align: left;
+            background: #f0f4f8;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #d0d7de;
+            display: none; /* Hidden until Start is clicked */
+        }
+        #log-list {
+            padding-left: 20px;
+            margin: 8px 0 0 0;
+        }
+        #log-list li {
+            margin: 4px 0;
+            color: #1a7f37;
+            font-weight: 500;
+        }
+        button { 
+            padding: 9px 18px; 
+            font-size: 1rem; 
+            margin: 5px;
+            cursor: pointer; 
+        }
+        #btn-end {
+            display: none; /* Hidden by default; shown via JS after Start */
+            background-color: #d93025;
+            color: white;
+            border: 1px solid #b3261e;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Sea Turtle Track Detector</h2>
+    
+    <button type="button" id="btn-start" onclick="init()">Start</button>
+    <button type="button" id="btn-end" onclick="endProgram()">End</button>
+
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
+
+    <div id="log-container">
+        <strong>Detected Instances:</strong>
+        <ul id="log-list">
+            <li id="empty-notice" style="color: #666; font-weight: normal;">Searching feed...</li>
+        </ul>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+    
+    <script type="text/javascript">
+        // Replace with your model link (keep the trailing /)
+        const MODEL_URL = "https://teachablemachine.withgoogle.com/models/FxsrpBiwt/";
+
+        let model, webcam, labelContainer, maxPredictions;
+        let isRunning = false;
+        let secondsElapsed = 0;
+        let timerInterval = null;
+
+        let instanceCount = 0;
+        let lastLoggedTime = -999;
+        let audioCtx = null;
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement("script");
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = () => reject(new Error("Failed to load " + src));
+                document.head.appendChild(s);
+            });
+        }
+
+        async function ensureLibrariesLoaded() {
+            if (typeof tf === "undefined") {
+                await loadScript("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js");
+            }
+            if (typeof tmImage === "undefined") {
+                await loadScript("https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js");
+            }
+        }
+
+        function playPing() {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            } catch (e) {
+                console.error("Audio error:", e);
+            }
+        }
+
+        async function init() {
+            if (isRunning) return;
+
+            // Prevent multiple requests by locking the button
+            const startBtn = document.getElementById("btn-start");
+            startBtn.disabled = true;
+            startBtn.innerText = "Loading...";
+
+            try {
+                await ensureLibrariesLoaded();
+
+                const modelURL = MODEL_URL + "model.json";
+                const metadataURL = MODEL_URL + "metadata.json";
+
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+
+                const flip = true;
+                webcam = new tmImage.Webcam(320, 240, flip);
+                await webcam.setup(); // Triggers browser camera prompt once
+                await webcam.play();
+                isRunning = true;
+                window.requestAnimationFrame(loop);
+
+                // Pre-initialize audio to satisfy browser gesture requirements
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+                // Set button states: hide/disable start, reveal end
+                startBtn.style.display = "none";
+                document.getElementById("btn-end").style.display = "inline-block";
+
+                // Setup camera preview
+                const webcamContainer = document.getElementById("webcam-container");
+                webcamContainer.innerHTML = "";
+                webcamContainer.appendChild(webcam.canvas);
+
+                // Setup class label outputs
+                labelContainer = document.getElementById("label-container");
+                labelContainer.innerHTML = "";
+                for (let i = 0; i < maxPredictions; i++) {
+                    labelContainer.appendChild(document.createElement("div"));
+                }
+
+                // Display log container
+                document.getElementById("log-container").style.display = "block";
+                const logList = document.getElementById("log-list");
+                logList.innerHTML = '<li id="empty-notice" style="color: #666; font-weight: normal;">Searching feed...</li>';
+
+                // Reset background tracking variables
+                secondsElapsed = 0;
+                instanceCount = 0;
+                lastLoggedTime = -999;
+                
+                clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    secondsElapsed++;
+                }, 1000);
+            } catch (err) {
+                console.error("Initialization error:", err);
+                alert("Could not start classifier: " + (err && err.message ? err.message : err));
+                startBtn.disabled = false;
+                startBtn.innerText = "Start";
+            }
+        }
+
+        async function loop() {
+            if (!isRunning) return;
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction =
+                    prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+            }
+
+            // Index 1 corresponds to Class 2
+            const class2Confidence = prediction[1].probability;
+
+            if (class2Confidence > 0.50 && (secondsElapsed - lastLoggedTime >= 2)) {
+                lastLoggedTime = secondsElapsed;
+                instanceCount++;
+                
+                playPing();
+
+                const emptyNotice = document.getElementById("empty-notice");
+                if (emptyNotice) {
+                    emptyNotice.remove();
+                }
+
+                const logList = document.getElementById("log-list");
+                const li = document.createElement("li");
+                li.innerText = `Instance ${instanceCount}: detected at ${secondsElapsed}s (${(class2Confidence * 100).toFixed(0)}% confidence)`;
+                logList.appendChild(li);
+            }
+        }
+
+        function endProgram() {
+            if (!isRunning) return;
+
+            isRunning = false;
+            clearInterval(timerInterval);
+            
+            if (webcam) {
+                webcam.stop();
+            }
+
+            // Hide End button, restore Start button
+            document.getElementById("btn-end").style.display = "none";
+            const startBtn = document.getElementById("btn-start");
+            startBtn.style.display = "inline-block";
+            startBtn.disabled = false;
+            startBtn.innerText = "Restart";
+
+            // Print final summary
+            const logList = document.getElementById("log-list");
+            const emptyNotice = document.getElementById("empty-notice");
+            if (emptyNotice) {
+                emptyNotice.innerText = "No instances detected.";
+            }
+
+            const summaryLi = document.createElement("li");
+            summaryLi.style.color = "#000";
+            summaryLi.style.fontWeight = "bold";
+            summaryLi.style.marginTop = "8px";
+            summaryLi.innerText = `Session Ended. Total Run Time: ${secondsElapsed} seconds.`;
+            logList.appendChild(summaryLi);
+        }
+
+        window.init = init;
+        window.endProgram = endProgram;
+    </script>
+</body>
+</html>

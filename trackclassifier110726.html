@@ -66,12 +66,12 @@
         </ul>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
     
     <script type="text/javascript">
         // Replace with your model link (keep the trailing /)
-        const URL = "https://teachablemachine.withgoogle.com/models/FxsrpBiwt/";
+        const MODEL_URL = "https://teachablemachine.withgoogle.com/models/FxsrpBiwt/";
 
         let model, webcam, labelContainer, maxPredictions;
         let isRunning = false;
@@ -81,6 +81,25 @@
         let instanceCount = 0;
         let lastLoggedTime = -999;
         let audioCtx = null;
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement("script");
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = () => reject(new Error("Failed to load " + src));
+                document.head.appendChild(s);
+            });
+        }
+
+        async function ensureLibrariesLoaded() {
+            if (typeof tf === "undefined") {
+                await loadScript("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js");
+            }
+            if (typeof tmImage === "undefined") {
+                await loadScript("https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js");
+            }
+        }
 
         function playPing() {
             try {
@@ -109,52 +128,61 @@
             startBtn.disabled = true;
             startBtn.innerText = "Loading...";
 
-            const modelURL = URL + "model.json";
-            const metadataURL = URL + "metadata.json";
+            try {
+                await ensureLibrariesLoaded();
 
-            model = await tmImage.load(modelURL, metadataURL);
-            maxPredictions = model.getTotalClasses();
+                const modelURL = MODEL_URL + "model.json";
+                const metadataURL = MODEL_URL + "metadata.json";
 
-            const flip = true;
-            webcam = new tmImage.Webcam(320, 240, flip);
-            await webcam.setup(); // Triggers browser camera prompt once
-            await webcam.play();
-            isRunning = true;
-            window.requestAnimationFrame(loop);
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
 
-            // Pre-initialize audio to satisfy browser gesture requirements
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const flip = true;
+                webcam = new tmImage.Webcam(320, 240, flip);
+                await webcam.setup(); // Triggers browser camera prompt once
+                await webcam.play();
+                isRunning = true;
+                window.requestAnimationFrame(loop);
 
-            // Set button states: hide/disable start, reveal end
-            startBtn.style.display = "none";
-            document.getElementById("btn-end").style.display = "inline-block";
+                // Pre-initialize audio to satisfy browser gesture requirements
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // Setup camera preview
-            const webcamContainer = document.getElementById("webcam-container");
-            webcamContainer.innerHTML = "";
-            webcamContainer.appendChild(webcam.canvas);
+                // Set button states: hide/disable start, reveal end
+                startBtn.style.display = "none";
+                document.getElementById("btn-end").style.display = "inline-block";
 
-            // Setup class label outputs
-            labelContainer = document.getElementById("label-container");
-            labelContainer.innerHTML = "";
-            for (let i = 0; i < maxPredictions; i++) {
-                labelContainer.appendChild(document.createElement("div"));
+                // Setup camera preview
+                const webcamContainer = document.getElementById("webcam-container");
+                webcamContainer.innerHTML = "";
+                webcamContainer.appendChild(webcam.canvas);
+
+                // Setup class label outputs
+                labelContainer = document.getElementById("label-container");
+                labelContainer.innerHTML = "";
+                for (let i = 0; i < maxPredictions; i++) {
+                    labelContainer.appendChild(document.createElement("div"));
+                }
+
+                // Display log container
+                document.getElementById("log-container").style.display = "block";
+                const logList = document.getElementById("log-list");
+                logList.innerHTML = '<li id="empty-notice" style="color: #666; font-weight: normal;">Searching feed...</li>';
+
+                // Reset background tracking variables
+                secondsElapsed = 0;
+                instanceCount = 0;
+                lastLoggedTime = -999;
+                
+                clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    secondsElapsed++;
+                }, 1000);
+            } catch (err) {
+                console.error("Initialization error:", err);
+                alert("Could not start classifier: " + (err && err.message ? err.message : err));
+                startBtn.disabled = false;
+                startBtn.innerText = "Start";
             }
-
-            // Display log container
-            document.getElementById("log-container").style.display = "block";
-            const logList = document.getElementById("log-list");
-            logList.innerHTML = '<li id="empty-notice" style="color: #666; font-weight: normal;">Searching feed...</li>';
-
-            // Reset background tracking variables
-            secondsElapsed = 0;
-            instanceCount = 0;
-            lastLoggedTime = -999;
-            
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                secondsElapsed++;
-            }, 1000);
         }
 
         async function loop() {
@@ -225,6 +253,9 @@
             summaryLi.innerText = `Session Ended. Total Run Time: ${secondsElapsed} seconds.`;
             logList.appendChild(summaryLi);
         }
+
+        window.init = init;
+        window.endProgram = endProgram;
     </script>
 </body>
 </html>

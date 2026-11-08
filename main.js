@@ -12,7 +12,7 @@ function createWindow() {
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (url !== pageURL) event.preventDefault();
   });
-  mainWindow.loadFile(path.join(__dirname, 'trackdetector110726ver1'));
+  mainWindow.loadFile(path.join(__dirname, 'trackdetector110726ver1.html'));
 }
 app.whenReady().then(() => {
   const trusted = wc => !!mainWindow && wc === mainWindow.webContents && wc.getURL() === pageURL;

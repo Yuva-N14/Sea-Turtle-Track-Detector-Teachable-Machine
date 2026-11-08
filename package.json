@@ -1,1 +1,21 @@
-
+{
+  "name": "sea-turtle-track-detector",
+  "version": "1.0.0",
+  "description": "Sea Turtle Track Detector",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "com.example.seaturtletracker",
+    "productName": "Sea Turtle Track Detector",
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

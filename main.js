@@ -1,7 +1,7 @@
 const { app, BrowserWindow, session } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const pageURL = pathToFileURL(path.join(__dirname, 'turtles.html')).href;
+const pageURL = pathToFileURL(path.join(__dirname, 'trackdetector110726ver1.html')).href;
 let mainWindow;
 function createWindow() {
   mainWindow = new BrowserWindow({

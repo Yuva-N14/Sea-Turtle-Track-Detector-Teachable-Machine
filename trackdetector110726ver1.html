@@ -218,6 +218,18 @@
                 const logList = document.getElementById("log-list");
                 const li = document.createElement("li");
                 li.innerText = `Instance ${instanceCount}: detected at ${secondsElapsed}s (${(class2Confidence * 100).toFixed(0)}% confidence)`;
+                // Capture the exact frame that triggered this detection.
+                const snapshot = document.createElement("img");
+                snapshot.src = webcam.canvas.toDataURL("image/png");
+                snapshot.alt = `Track detection ${instanceCount}`;
+                snapshot.style.display = "block";
+                snapshot.style.width = "240px";
+                snapshot.style.maxWidth = "100%";
+                snapshot.style.marginTop = "8px";
+                snapshot.style.marginBottom = "15px";
+                snapshot.style.borderRadius = "6px";
+                
+                li.appendChild(snapshot);
                 logList.appendChild(li);
             }
         }

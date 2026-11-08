@@ -12,7 +12,7 @@ function createWindow() {
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (url !== pageURL) event.preventDefault();
   });
-  mainWindow.loadFile(path.join(__dirname, 'turtles.html'));
+  mainWindow.loadFile(path.join(__dirname, 'trackdetector110726ver1'));
 }
 app.whenReady().then(() => {
   const trusted = wc => !!mainWindow && wc === mainWindow.webContents && wc.getURL() === pageURL;

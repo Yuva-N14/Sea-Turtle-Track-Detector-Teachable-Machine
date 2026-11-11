@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win --publish never",
-    "dist:mac": "electron-builder --mac pkg --x64 --arm64 --publish never"
+    "dist:mac": "electron-builder --mac dmg --x64 --arm64 --publish never"
   },
   "devDependencies": {
     "electron": "latest",
@@ -19,7 +19,7 @@
       "target": "nsis"
     },
     "mac": {
-      "target": "pkg",
+      "target": "dmg",
       "identity": null,
       "extendInfo": {
         "NSCameraUsageDescription": "This app uses your camera to detect sea turtle tracks."

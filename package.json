@@ -19,7 +19,7 @@
       "target": "nsis"
     },
     "mac": {
-      "target": "dmg",
+      "target": "pkg",
       "identity": null,
       "extendInfo": {
         "NSCameraUsageDescription": "This app uses your camera to detect sea turtle tracks."
